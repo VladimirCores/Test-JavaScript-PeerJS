@@ -5,21 +5,58 @@
 
 (function(){
 	var peer;
-	var connection = {};
+	var initTime = 0;
+	var startTime = 0;
+	var deltaTime = 0;
+	var localTime = 0;
+	var cmConnection = {};
+	var mcConnection;
+	var stream;
+	var systemtime;
 	
 	// if (sessionStorage.getItem("is_reloaded")) {
 	// 	peer = new Peer(sessionStorage.getItem("is_reloaded"), {key: 'vnfzjzv992euq5mi'});
 	// 	peer.disconnect();
 	// } else {
-	peer = new Peer({host: 'http://peeril.herokuapp.com/', port: 80});
+	// peer = new Peer({host: 'http://peeril.herokuapp.com/', port: 80});
+	// peer = new Peer({key: 'vnfzjzv992euq5mi'});
+	peer = new Peer({ host: 'localhost', port: 9000 });
 	// }
 
 	function Handle_Peer_Open (id) {
-		console.log('My peer ID is: ' + id);
+		console.log('CLIENT OPEN, ID: ' + id);
 	}
 
 	function Handle_Peer_Connection (dataConnection) {
-		connections.push(dataConnection);
+		console.log("Handle_Peer_Connection");
+		if(!mcConnection) {
+			mcConnection = dataConnection;
+			mcConnection.on('data', function(data) { 
+				if(deltaTime == 0) {
+					deltaTime = Date.now() - initTime;
+					console.log("Delta Time: ", deltaTime)
+					console.log("Input Time: ", data);
+					// systemtime = new Date();
+					systemtime = parseInt(data) + deltaTime * 0.50
+					startTime = Date.now();
+					console.log("Init Time: " + initTime);
+					// systemtime.setTime((parseInt(data) + deltaTime * 0.50));
+					console.log("System Time: ", systemtime.getTime());
+				} else {
+					console.log("\nInput Time: ", data);
+					// var now = systemtime.getTime() + (Date.now() - startTime);
+					var now = systemtime + (Date.now() - startTime);
+					var delta = now - parseInt(data);
+					console.log("Delta Time: ", delta);
+					var shootTime = 5000 - delta;
+					console.log("Shoot Time: ", shootTime);
+					responceTime.innerText = (now - 1413466000000) + " | " + delta + " || " + shootTime;
+					setTimeout(function () {
+						cmConnection.send(now - delta);
+					}, shootTime)
+				}
+			});
+		}
 		console.log(dataConnection); 
 	}
 
@@ -35,17 +72,56 @@
 		console.log('Received', data);
 	}
 
+	function Handle_Connection_Error (error) {
+		console.log('Error Connection', error);
+	}
+
 	function Handle_MouseMove (e) {
-		console.log(e)
-		connection.send({ x:e.x, y:e.y });
+		if(cmConnection.open)
+		cmConnection.send({ x:e.x, y:e.y });
 	}
 
 	peer.on('open', Handle_Peer_Open);
 	peer.on('connection', Handle_Peer_Connection);
 	peer.on('call', Handle_Peer_Call);
 
-	connection = peer.connect('mainnode');
-	connection.on('data', Handle_Connection_Data);
-	connection.on('open', Handle_Connection_Open);
+	initTime = Date.now();
+	responceTime.innerText = initTime;
+
+	cmConnection = peer.connect('mainnode');
+	cmConnection.on('data', Handle_Connection_Data);
+	cmConnection.on('open', Handle_Connection_Open);
+	cmConnection.on('error', Handle_Connection_Error);
+
+	//syncTime();
+
+	function syncTime() {
+	    // Set up our time object, synced by the HTTP DATE header
+	    // Fetch the page over JS to get just the headers
+	    console.log("syncing time")
+	    var r = new XMLHttpRequest();
+	    var start = Date.now();
+
+	    r.open('HEAD', document.location, false);
+	    r.onreadystatechange = function()
+	    {
+	        if (r.readyState != 4)
+	        {
+	            return;
+	        }
+	        var latency = Date.now() - start;
+	        var timestring = r.getResponseHeader("DATE");
+
+	        console.log("timestring", timestring);
+	        console.log("latency", latency);
+
+	        // Set the time to the **slightly old** date sent from the 
+	        // server, then adjust it to a good estimate of what the
+	        // server time is **right now**.
+	        systemtime = new Date(timestring);
+	        systemtime.setMilliseconds(systemtime.getMilliseconds() + (latency / 2))
+	    };
+	    r.send(null);
+	}
 
 })()
