@@ -12,6 +12,7 @@
 	var connections = {};
 	var connectionsArr = [];
 	var objects = {};
+	var syncTime = 0;
 
 	var stage = new Kinetic.Stage({
         container: 'container',
@@ -46,7 +47,7 @@
 		dataConnection.on("data", function (data) { 
 			if(typeof data == "object") 
 			objects[peerConnectedID].setPosition(data.x, data.y); 
-			else console.log(data);
+			else console.log(data, (data - (Date.now() - syncTime))*0.5);
 		});
 		dataConnection.on("close", function () {
 			console.log("Disconnect", peerConnected); 
@@ -97,11 +98,11 @@
 		console.log("Send Sync")
 		var connection;
 		var connectionID = "";
-		var now = Date.now();
+		syncTime = Date.now();
 		for(connectionID in connections) {
 			connection = connections[connectionID];
 			// console.log("conntection:", connectionID, connection);
-			connection.send(now);
+			connection.send(syncTime);
 		};
 		// for (var i = connectionsArr.length - 1; i >= 0; i--) {
 		// 	connection = connectionsArr[i];
